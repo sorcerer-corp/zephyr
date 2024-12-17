@@ -409,6 +409,12 @@ static int ubx_m8_configure_gnss_device_baudrate_prerequisite(const struct devic
 	const struct ubx_m8_config *config = dev->config;
 	uint32_t target_baudrate = config->uart_baudrate;
 
+	// TODO: refactor this entire function to skip baud rate prep if it's the default baudrate
+	// for that module
+	if (target_baudrate == 38400) {
+		return 0;
+	}
+
 	ret = ubx_m8_validate_baudrate(dev, target_baudrate);
 	if (ret < 0) {
 		return ret;
@@ -931,7 +937,8 @@ static int ubx_m8_configure(const struct device *dev)
 	(void)ubx_m8_configure_gnss_device_baudrate_prerequisite(dev);
 
 	/* Stopping GNSS messages for clearer communication while configuring the device. */
-	ret = ubx_m8_ubx_cfg_rst(dev, UBX_CFG_RST_RESET_MODE_CONTROLLED_GNSS_STOP);
+	// this has been changed to enabled faster bootups
+	ret = ubx_m8_ubx_cfg_rst(dev, UBX_CFG_RST_RESET_MODE_HARD_RESET);
 	if (ret < 0) {
 		goto reset;
 	}
