@@ -340,6 +340,9 @@ static int soft_reset(const struct device *dev)
 		return -EINVAL;
 	}
 
+	// Wait for 500ms to ensure the device is ready for the reset. This is needed on the Silver Anteater
+	k_msleep(500);
+
 	ret = i2c_reg_write_byte_dt(&conf->i2c, BMP5_REG_CMD, reset_cmd);
 
 	if (ret == BMP5_OK) {
