@@ -8,12 +8,12 @@ zephyr_library()
 zephyr_library_sources_ifdef(CONFIG_USERSPACE           random_handlers.c)
 endif()
 
-if(CONFIG_TIMER_RANDOM_GENERATOR OR CONFIG_TEST_CSPRNG_GENERATOR)
-  message(WARNING "
-    Warning: CONFIG_TIMER_RANDOM_GENERATOR and CONFIG_TEST_CSPRNG_GENERATOR are
-    not truly random generators. This capability is not secure and it is
-    provided for testing purposes only. Use it carefully.")
-endif()
+# if(CONFIG_TIMER_RANDOM_GENERATOR OR CONFIG_TEST_CSPRNG_GENERATOR)
+#   message(WARNING "
+#     Warning: CONFIG_TIMER_RANDOM_GENERATOR and CONFIG_TEST_CSPRNG_GENERATOR are
+#     not truly random generators. This capability is not secure and it is
+#     provided for testing purposes only. Use it carefully.")
+# endif()
 
 zephyr_library_sources_ifdef(CONFIG_TIMER_RANDOM_GENERATOR          random_timer.c)
 zephyr_library_sources_ifdef(CONFIG_XOSHIRO_RANDOM_GENERATOR        random_xoshiro128.c)
