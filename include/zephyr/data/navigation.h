@@ -33,6 +33,12 @@ struct navigation_data {
 	uint32_t speed;
 	/** Altitude above MSL in millimeters */
 	int32_t altitude;
+	/** Velocity north in millimeters per second */
+	int32_t vel_north;
+	/** Velocity east in millimeters per second */
+	int32_t vel_east;
+	/** Velocity down in millimeters per second */
+	int32_t vel_down;
 };
 
 /**

@@ -69,6 +69,9 @@ void gnss_ubx_common_pvt_callback(struct modem_ubx *ubx, const struct ubx_frame 
 					(nav_pvt->nav.head_motion + (360 * 100000)) :
 					(nav_pvt->nav.head_motion)) / 100),
 			.speed = nav_pvt->nav.ground_speed,
+			.vel_north = nav_pvt->nav.vel_north,
+			.vel_east = nav_pvt->nav.vel_east,
+			.vel_down = nav_pvt->nav.vel_down,
 			.altitude = nav_pvt->nav.hmsl,
 		},
 		.utc = {
