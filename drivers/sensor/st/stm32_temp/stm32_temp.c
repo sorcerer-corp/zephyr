@@ -220,12 +220,6 @@ static int stm32_temp_sample_fetch(const struct device *dev, enum sensor_channel
 	k_mutex_lock(&data->mutex, K_FOREVER);
 	pm_device_runtime_get(data->adc);
 
-	rc = adc_channel_setup(data->adc, &data->adc_cfg);
-	if (rc) {
-		LOG_DBG("Setup AIN%u got %d", data->adc_cfg.channel_id, rc);
-		goto unlock;
-	}
-
 	adc_enable_tempsensor_channel(data->adc_base);
 
 	rc = adc_read(data->adc, sp);
@@ -235,7 +229,6 @@ static int stm32_temp_sample_fetch(const struct device *dev, enum sensor_channel
 
 	adc_disable_tempsensor_channel(data->adc_base);
 
-unlock:
 	pm_device_runtime_put(data->adc);
 	k_mutex_unlock(&data->mutex);
 
@@ -263,12 +256,19 @@ static int stm32_temp_init(const struct device *dev)
 {
 	struct stm32_temp_data *data = dev->data;
 	struct adc_sequence *asp = &data->adc_seq;
+	int rc;
 
 	k_mutex_init(&data->mutex);
 
 	if (!device_is_ready(data->adc)) {
 		LOG_ERR("Device %s is not ready", data->adc->name);
 		return -ENODEV;
+	}
+
+	rc = adc_channel_setup(data->adc, &data->adc_cfg);
+	if (rc) {
+		LOG_DBG("Setup AIN%u got %d", data->adc_cfg.channel_id, rc);
+		return rc;
 	}
 
 	*asp = (struct adc_sequence){
