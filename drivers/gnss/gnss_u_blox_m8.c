@@ -12,6 +12,7 @@
 #include <zephyr/drivers/uart.h>
 #include <zephyr/drivers/gnss.h>
 #include <zephyr/drivers/gnss/gnss_publish.h>
+#include <zephyr/drivers/gpio.h>
 
 #include <zephyr/modem/ubx.h>
 #include <zephyr/modem/backend/uart.h>
@@ -28,6 +29,7 @@ struct ubx_m8_config {
 		uint32_t initial;
 		uint32_t desired;
 	} baudrate;
+	struct gpio_dt_spec reset_gpio;
 };
 
 struct ubx_m8_data {
@@ -35,12 +37,12 @@ struct ubx_m8_data {
 	struct {
 		struct modem_pipe *pipe;
 		struct modem_backend_uart uart_backend;
-		uint8_t receive_buf[1024];
+		uint8_t receive_buf[2048];
 		uint8_t transmit_buf[256];
 	} backend;
 	struct {
 		struct modem_ubx inst;
-		uint8_t receive_buf[1024];
+		uint8_t receive_buf[2048];
 	} ubx;
 	struct {
 		struct modem_ubx_script inst;
@@ -53,32 +55,6 @@ struct ubx_m8_data {
 #endif
 };
 
-UBX_FRAME_DEFINE(disable_gga,
-	UBX_FRAME_CFG_MSG_RATE_INITIALIZER(UBX_CLASS_ID_NMEA_STD, UBX_MSG_ID_NMEA_STD_GGA, 0));
-UBX_FRAME_DEFINE(disable_rmc,
-	UBX_FRAME_CFG_MSG_RATE_INITIALIZER(UBX_CLASS_ID_NMEA_STD, UBX_MSG_ID_NMEA_STD_RMC, 0));
-UBX_FRAME_DEFINE(disable_gsv,
-	UBX_FRAME_CFG_MSG_RATE_INITIALIZER(UBX_CLASS_ID_NMEA_STD, UBX_MSG_ID_NMEA_STD_GSV, 0));
-UBX_FRAME_DEFINE(disable_dtm,
-	UBX_FRAME_CFG_MSG_RATE_INITIALIZER(UBX_CLASS_ID_NMEA_STD, UBX_MSG_ID_NMEA_STD_DTM, 0));
-UBX_FRAME_DEFINE(disable_gbs,
-	UBX_FRAME_CFG_MSG_RATE_INITIALIZER(UBX_CLASS_ID_NMEA_STD, UBX_MSG_ID_NMEA_STD_GBS, 0));
-UBX_FRAME_DEFINE(disable_gll,
-	UBX_FRAME_CFG_MSG_RATE_INITIALIZER(UBX_CLASS_ID_NMEA_STD, UBX_MSG_ID_NMEA_STD_GLL, 0));
-UBX_FRAME_DEFINE(disable_gns,
-	UBX_FRAME_CFG_MSG_RATE_INITIALIZER(UBX_CLASS_ID_NMEA_STD, UBX_MSG_ID_NMEA_STD_GNS, 0));
-UBX_FRAME_DEFINE(disable_grs,
-	UBX_FRAME_CFG_MSG_RATE_INITIALIZER(UBX_CLASS_ID_NMEA_STD, UBX_MSG_ID_NMEA_STD_GRS, 0));
-UBX_FRAME_DEFINE(disable_gsa,
-	UBX_FRAME_CFG_MSG_RATE_INITIALIZER(UBX_CLASS_ID_NMEA_STD, UBX_MSG_ID_NMEA_STD_GSA, 0));
-UBX_FRAME_DEFINE(disable_gst,
-	UBX_FRAME_CFG_MSG_RATE_INITIALIZER(UBX_CLASS_ID_NMEA_STD, UBX_MSG_ID_NMEA_STD_GST, 0));
-UBX_FRAME_DEFINE(disable_vlw,
-	UBX_FRAME_CFG_MSG_RATE_INITIALIZER(UBX_CLASS_ID_NMEA_STD, UBX_MSG_ID_NMEA_STD_VLW, 0));
-UBX_FRAME_DEFINE(disable_vtg,
-	UBX_FRAME_CFG_MSG_RATE_INITIALIZER(UBX_CLASS_ID_NMEA_STD, UBX_MSG_ID_NMEA_STD_VTG, 0));
-UBX_FRAME_DEFINE(disable_zda,
-	UBX_FRAME_CFG_MSG_RATE_INITIALIZER(UBX_CLASS_ID_NMEA_STD, UBX_MSG_ID_NMEA_STD_ZDA, 0));
 UBX_FRAME_DEFINE(enable_nav,
 	UBX_FRAME_CFG_MSG_RATE_INITIALIZER(UBX_CLASS_ID_NAV, UBX_MSG_ID_NAV_PVT, 1));
 #if CONFIG_GNSS_SATELLITES
@@ -86,10 +62,7 @@ UBX_FRAME_DEFINE(enable_sat,
 	UBX_FRAME_CFG_MSG_RATE_INITIALIZER(UBX_CLASS_ID_NAV, UBX_MSG_ID_NAV_SAT, 1));
 #endif
 
-UBX_FRAME_ARRAY_DEFINE(u_blox_m8_init_seq,
-	&disable_gga, &disable_rmc, &disable_gsv, &disable_dtm, &disable_gbs,
-	&disable_gll, &disable_gns, &disable_grs, &disable_gsa, &disable_gst,
-	&disable_vlw, &disable_vtg, &disable_zda, &enable_nav,
+UBX_FRAME_ARRAY_DEFINE(u_blox_m8_init_seq, &enable_nav,
 #if CONFIG_GNSS_SATELLITES
 	&enable_sat,
 #endif
@@ -323,6 +296,15 @@ static int ubx_m8_init(const struct device *dev)
 {
 	int err = 0;
 	const struct ubx_m8_config *cfg = dev->config;
+
+	if (cfg->reset_gpio.port != NULL && !device_is_ready(cfg->reset_gpio.port)) {
+		LOG_ERR("Reset GPIO not ready");
+		return -ENODEV;
+	}
+
+	if (cfg->reset_gpio.port != NULL) {
+		gpio_pin_configure_dt(&cfg->reset_gpio, GPIO_OUTPUT_INACTIVE);
+	}
 
 	(void)init_match(dev);
 
@@ -559,6 +541,58 @@ static int ubx_m8_get_supported_systems(const struct device *dev, gnss_systems_t
 	return 0;
 }
 
+static int ubx_m8_reset(const struct device *dev)
+{
+	int err = 0;
+
+	// // Assert reset GPIO
+	// err = gpio_pin_configure_dt(&cfg->reset_gpio, GPIO_OUTPUT_ACTIVE);
+	// if (err < 0) {
+	// 	LOG_ERR("Failed to configure reset GPIO: %d", err);
+	// 	return err;
+	// }
+	// k_sleep(K_MSEC(25));
+	// gpio_pin_configure_dt(&cfg->reset_gpio, GPIO_OUTPUT_INACTIVE);
+	// k_sleep(K_MSEC(5000));
+
+	err = configure_baudrate(dev);
+	if (err < 0) {
+		LOG_ERR("Failed to configure baud-rate: %d", err);
+		return err;
+	}
+	k_sleep(K_MSEC(1000));
+
+	const static struct ubx_frame stop_gnss =
+		UBX_FRAME_CFG_RST_INITIALIZER(UBX_CFG_RST_HOT_START, UBX_CFG_RST_MODE_GNSS_STOP);
+
+	err = ubx_m8_msg_send(dev, &stop_gnss, UBX_FRAME_SZ(stop_gnss.payload_size), false);
+	if (err != 0) {
+		LOG_ERR("Failed to stop GNSS module: %d", err);
+		return err;
+	}
+	k_sleep(K_MSEC(1000));
+
+	for (size_t i = 0; i < ARRAY_SIZE(u_blox_m8_init_seq); i++) {
+		err = ubx_m8_msg_send(dev, u_blox_m8_init_seq[i],
+				      UBX_FRAME_SZ(u_blox_m8_init_seq[i]->payload_size), false);
+		if (err < 0) {
+			LOG_ERR("Failed to send init sequence - idx: %d, result: %d", i, err);
+			continue;
+		}
+	}
+
+	const static struct ubx_frame start_gnss =
+		UBX_FRAME_CFG_RST_INITIALIZER(UBX_CFG_RST_HOT_START, UBX_CFG_RST_MODE_GNSS_START);
+
+	err = ubx_m8_msg_send(dev, &start_gnss, UBX_FRAME_SZ(start_gnss.payload_size), false);
+	if (err != 0) {
+		LOG_ERR("Failed to start GNSS module: %d", err);
+		return err;
+	}
+
+	return 0;
+}
+
 static DEVICE_API(gnss, gnss_api) = {
 	.set_fix_rate = ubx_m8_set_fix_rate,
 	.get_fix_rate = ubx_m8_get_fix_rate,
@@ -567,6 +601,7 @@ static DEVICE_API(gnss, gnss_api) = {
 	.set_enabled_systems = ubx_m8_set_enabled_systems,
 	.get_enabled_systems = ubx_m8_get_enabled_systems,
 	.get_supported_systems = ubx_m8_get_supported_systems,
+	.reset = ubx_m8_reset,
 };
 
 #define UBX_M8(inst)										   \

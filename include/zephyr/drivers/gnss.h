@@ -105,6 +105,9 @@ typedef int (*gnss_get_supported_systems_t)(const struct device *dev, gnss_syste
 /** API for getting timestamp of last PPS pulse */
 typedef int (*gnss_get_latest_timepulse_t)(const struct device *dev, k_ticks_t *timestamp);
 
+/** API for resetting GNSS receiver */
+typedef int (*gnss_reset_t)(const struct device *dev);
+
 /** GNSS fix status */
 enum gnss_fix_status {
 	/** No GNSS fix acquired */
@@ -175,6 +178,7 @@ __subsystem struct gnss_driver_api {
 	gnss_get_enabled_systems_t get_enabled_systems;
 	gnss_get_supported_systems_t get_supported_systems;
 	gnss_get_latest_timepulse_t get_latest_timepulse;
+	gnss_reset_t reset;
 };
 
 /** GNSS data structure */
